@@ -1,0 +1,36 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return signedIn()
+        && request.auth.uid in ['8BYCyjUAvqciK29RCe26RUNX7IM2'];
+    }
+
+    function membership(storeId) {
+      return firestore.get(/databases/(default)/documents/stores/$(storeId)/members/$(request.auth.uid));
+    }
+
+    function canEditStore(storeId) {
+      return isSuperAdmin()
+        || (signedIn()
+          && firestore.exists(/databases/(default)/documents/stores/$(storeId)/members/$(request.auth.uid))
+          && membership(storeId).data.get('active', true) == true
+          && membership(storeId).data.role in ['owner', 'editor']);
+    }
+
+    match /stores/{storeId}/products/{productId}/{fileName} {
+      allow read: if true;
+      allow write: if canEditStore(storeId)
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

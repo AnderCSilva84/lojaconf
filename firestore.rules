@@ -53,6 +53,14 @@ service cloud.firestore {
           && request.resource.data.role in ['owner', 'editor', 'viewer'];
         allow delete: if isStoreOwner(storeId);
       }
+
+      // Dados internos: o superadministrador da plataforma não recebe acesso
+      // automático. Ele precisa ser membro explícito da loja para consultá-los.
+      match /{privateCollection}/{documentId} {
+        allow read, write: if privateCollection in [
+          'orders', 'sales', 'inventoryMovements', 'cashMovements'
+        ] && isActiveMember(storeId);
+      }
     }
 
     match /users/{uid} {
